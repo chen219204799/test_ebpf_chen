@@ -58,7 +58,7 @@ static void poll_stats(int map_fd, int interval)
 			for (i = 0; i < nr_cpus; i++)
 				sum += values[i];
 			if (sum > prev[key])
-				printf("proto %u: %10llu pkt/s\n",
+				printf("type %u: %10llu pkt/s\n",
 				       key, (sum - prev[key]) / interval);
 			prev[key] = sum;
 		}
@@ -106,48 +106,57 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	//获取网口索引
 	ifindex = if_nametoindex(argv[optind]);
 	if (!ifindex) {
 		perror("if_nametoindex");
 		return 1;
 	}
 
+	//根据对应的内核程序文件生成obj对象
 	snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
 	obj = bpf_object__open_file(filename, NULL);
 	if (libbpf_get_error(obj))
 		return 1;
 
+	//根据获取的obj拿到内核函数并设置类型
 	prog = bpf_object__next_program(obj, NULL);
 	bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
 
+	//加载到内核空间
 	err = bpf_object__load(obj);
 	if (err)
 		return 1;
 
+	//获取内核空间的obj   ->prog->fd索引
 	prog_fd = bpf_program__fd(prog);
 
+	//获取obj的map信息
 	map = bpf_object__next_map(obj, NULL);
 	if (!map) {
 		printf("finding a map in obj file failed\n");
 		return 1;
 	}
-	map_fd = bpf_map__fd(map);
 
+	//获取map的fd
+	map_fd = bpf_map__fd(map);
 	if (!prog_fd) {
 		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
 		return 1;
 	}
 	
 	
+	//设置信号处理函数 保证用户态进程退出时程序正确处理
+	signal(SIGINT, int_exit);//ctrl + c
+	signal(SIGTERM, int_exit);//kill 
 
-	signal(SIGINT, int_exit);
-	signal(SIGTERM, int_exit);
-
+	//绑定网口上的XDP程序
 	if (bpf_xdp_attach(ifindex, prog_fd, xdp_flags, NULL) < 0) {
 		printf("link set xdp fd failed\n");
 		return 1;
 	}
 
+	//根据prog_fd获取内核传递的信息
 	err = bpf_prog_get_info_by_fd(prog_fd, &info, &info_len);
 	if (err) {
 		printf("can't get prog info - %s\n", strerror(errno));
@@ -155,6 +164,7 @@ int main(int argc, char **argv)
 	}
 	prog_id = info.id;
 
+	//循环处理map中的信息,显示到用户态
 	poll_stats(map_fd, 1);
 
 	return 0;
