@@ -12,4 +12,5 @@ cd /usr/src/linux-source-6.5.0/
 #使用如下命令编译即可
 make M=samples/bpf
 
-
+#执行命令如下
+./test_chenkang_xdp_fw -S intface_name
