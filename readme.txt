@@ -14,3 +14,5 @@ make M=samples/bpf
 
 #执行命令如下
 ./test_chenkang_xdp_fw -S intface_name
+
+正在寻找是否有方法可以动态设置阻断IP
