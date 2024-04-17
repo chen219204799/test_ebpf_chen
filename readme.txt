@@ -15,6 +15,3 @@ make M=samples/bpf
 #执行命令如下
 ./test_chenkang_xdp_fw -S intface_name
 
-可以通过BPF_MAP_TYPE_LPM_TRIE 类型的map达到高效率的IP地址匹配
-参考资料：https://docs.kernel.org/next/bpf/map_lpm_trie.html
-正在学习map数据的使用方法
