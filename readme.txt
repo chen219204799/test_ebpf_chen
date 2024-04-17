@@ -1,3 +1,5 @@
+此demo为eBPF机制下的源IP防火墙
+
 #环境如下：
 VMware Workstation
 	Ubantu-22.04.4-64
@@ -15,3 +17,7 @@ make M=samples/bpf
 #执行命令如下
 ./test_chenkang_xdp_fw -S intface_name
 
+后续代码优化思路
+1.可以将工程从/usr/src/linux-source-6.5.0/samples/bpf内核路径中摘出。
+2.可以以文件方式或程序启动参数方式载入需要阻断的IP地址。
+3.可以优化阻断的条件，可以是五元组的任意条件。
