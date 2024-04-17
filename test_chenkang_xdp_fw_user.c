@@ -26,11 +26,15 @@ struct ipv4_lpm_key {
         __u32 prefixlen;
         __u32 data;
 };
+struct ipv6_lpm_key {
+        __u32 prefixlen;
+        __u32 data[4];
+};
 
-int add_prefix_entry(int lpm_fd, __u32 addr, __u32 prefixlen, void *value);
 
 
 //添加IP地址进地址map
+int add_prefix_entry(int lpm_fd, __u32 addr, __u32 prefixlen, void *value);
 int add_prefix_entry(int lpm_fd, __u32 addr, __u32 prefixlen, void *value)
 {
         struct ipv4_lpm_key ipv4_key = {
@@ -39,6 +43,21 @@ int add_prefix_entry(int lpm_fd, __u32 addr, __u32 prefixlen, void *value)
         };
         return bpf_map_update_elem(lpm_fd, &ipv4_key, value, BPF_ANY);
 }
+
+
+int add_prefix_entry_v6(int lpm_fd, __u32 addr[4], __u32 prefixlen, void *value);
+int add_prefix_entry_v6(int lpm_fd, __u32 addr[4], __u32 prefixlen, void *value)
+{
+        struct ipv6_lpm_key ipv6_key = {
+                .prefixlen = prefixlen,
+				.data[0] = addr[0],
+				.data[1] = addr[1],
+				.data[2] = addr[2],
+				.data[3] = addr[3]
+        };
+        return bpf_map_update_elem(lpm_fd, &ipv6_key, value, BPF_ANY);
+}
+
 
 
 static void int_exit(int sig)
@@ -100,7 +119,7 @@ int main(int argc, char **argv)
 	struct bpf_prog_info info = {};
 	__u32 info_len = sizeof(info);
 	const char *optstr = "FSN";
-	int prog_fd, map_info_fd, map_iplist_fd,opt;
+	int prog_fd, map_info_fd, map_iplist_fd,map_ipv6list_fd,opt;
 	struct bpf_program *prog;
 	struct bpf_object *obj;
 	struct bpf_map *map_info = NULL;
@@ -108,8 +127,11 @@ int main(int argc, char **argv)
 	long *value;
 	char filename[256];
 	int err;
-	__u32 ip_addr = 0x5801a8c0;
-	__u32 prefixlen = 32;
+	__u32 ipv4_addr = 0x5801a8c0;
+	__u32 prefixlen_v4 = 32;
+
+	__u32 ipv6_addr[4] = {0xaabbccdd,0xaabbccdd,0xaabbccdd,0xaabbccdd};
+	__u32 prefixlen_v6 = 128;
 
 	while ((opt = getopt(argc, argv, optstr)) != -1) {
 		switch (opt) {
@@ -176,22 +198,34 @@ int main(int argc, char **argv)
 
 
 	
-	//获取obj的map_ipv4_lpm_map信息
+	//获取obj的ipv4_lpm_map信息
 	map_iplist = bpf_object__find_map_by_name(obj, "ipv4_lpm_map");
 	if (!map_iplist) {
 		printf("finding a map in obj file failed\n");
 		return 1;
 	}
-	
-	//获取map2的fd
+	//获取ipv4_lpm_map的fd
 	map_iplist_fd = bpf_object__find_map_fd_by_name(obj, "ipv4_lpm_map");
 	if (!map_iplist_fd) {
 		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
 		return 1;
 	}
-	//添加IPv4地址进map
-	if(add_prefix_entry(map_iplist_fd, ip_addr, prefixlen,&value)){
+	//添加IPv4地址进ipv4_lpm_map
+	if(add_prefix_entry(map_iplist_fd, ipv4_addr, prefixlen_v4,&value)){
 		printf("set ip_addr failed \n");
+		return 1;
+	}
+
+
+	//获取ipv6_lpm_map的fd
+	map_ipv6list_fd = bpf_object__find_map_fd_by_name(obj, "ipv6_lpm_map");
+	if (!map_ipv6list_fd) {
+		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
+		return 1;
+	}
+	//添加IPv6地址进ipv6_lpm_map
+	if(add_prefix_entry_v6(map_ipv6list_fd, ipv6_addr, prefixlen_v6,&value)){
+		printf("set ipv6_addr failed \n");
 		return 1;
 	}
 	

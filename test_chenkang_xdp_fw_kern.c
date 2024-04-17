@@ -40,9 +40,18 @@ struct {
 } ipv4_lpm_map SEC(".maps");
 
 
+struct ipv6_lpm_key {
+        __u32 prefixlen;
+        __u32 data[4];
+};
 
-
-
+struct {
+        __uint(type, BPF_MAP_TYPE_LPM_TRIE);
+        __type(key, struct ipv6_lpm_key);
+        __type(value, __u32);
+        __uint(map_flags, BPF_F_NO_PREALLOC);
+        __uint(max_entries, 255);
+} ipv6_lpm_map SEC(".maps");
 
 
 struct {
@@ -63,6 +72,20 @@ void *lookup_by_addr(__u32 ipaddr)
         };
 
         return bpf_map_lookup_elem(&ipv4_lpm_map, &key);
+}
+
+
+void *lookup_by_addrv6(__u32 ipaddr[4]);
+void *lookup_by_addrv6(__u32 ipaddr[4])
+{
+        struct ipv6_lpm_key key = {
+			key.prefixlen = 128,
+			key.data[0] = ipaddr[0],
+			key.data[1] = ipaddr[1],
+			key.data[2] = ipaddr[2],
+			key.data[3] = ipaddr[3]
+		};
+        return bpf_map_lookup_elem(&ipv6_lpm_map, &key);
 }
 
 
@@ -107,10 +130,7 @@ int xdp_prog1(struct xdp_md *ctx)
 		if (ip6h + 1 > data_end)
 			return XDP_DROP;
 		//IP地址阻断
-		if(0xaabbccdd == ip6h->saddr.in6_u.u6_addr32[0] && 
-			0xaabbccdd == ip6h->saddr.in6_u.u6_addr32[1] && 
-			0xaabbccdd == ip6h->saddr.in6_u.u6_addr32[2] && 
-			0xaabbccdd == ip6h->saddr.in6_u.u6_addr32[3])
+		if(lookup_by_addrv6(ip6h->saddr.in6_u.u6_addr32))
 		{
 			type = type_drop;
 			rc = XDP_DROP;
