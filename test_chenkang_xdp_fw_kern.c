@@ -1,10 +1,4 @@
-/* Copyright (c) 2016 PLUMgrid
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of version 2 of the GNU General Public
- * License as published by the Free Software Foundation.
- */
-#define KBUILD_MODNAME "foo"
+#define KBUILD_MODNAME "test_chenkang_xdp_fw"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
@@ -21,10 +15,6 @@
 #include <linux/bpf.h>
 
 #define type_drop 99
-#define type_ip_addr 66
-
-
-
 
 struct ipv4_lpm_key {
         __u32 prefixlen;
@@ -61,8 +51,7 @@ struct {
 	__uint(max_entries, 256);
 } rxcnt SEC(".maps");
 
-#define XDPBUFSIZE	60
-
+/*查找ip地址是否存在map中 存在return地址 否则返回NULL*/
 void *lookup_by_addr(__u32 ipaddr);
 void *lookup_by_addr(__u32 ipaddr)
 {
@@ -74,7 +63,7 @@ void *lookup_by_addr(__u32 ipaddr)
         return bpf_map_lookup_elem(&ipv4_lpm_map, &key);
 }
 
-
+/*查找ipv6地址是否存在map中 存在return地址 否则返回NULL*/
 void *lookup_by_addrv6(__u32 ipaddr[4]);
 void *lookup_by_addrv6(__u32 ipaddr[4])
 {
@@ -102,7 +91,7 @@ int xdp_prog1(struct xdp_md *ctx)
 	struct iphdr *iph;
 	u16 h_proto;
 	u64 nh_off;
-	int rc = XDP_PASS;
+	int rc = XDP_PASS;//默认动作放行
 	u32 type = 0;
 	long *value;
 

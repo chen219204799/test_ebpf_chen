@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2016 PLUMgrid
- */
 #include <linux/bpf.h>
 #include <linux/if_link.h>
 #include <assert.h>
@@ -12,8 +9,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <net/if.h>
-
-#include "bpf_util.h"
+#include <bpf_util.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
@@ -59,7 +55,7 @@ int add_prefix_entry_v6(int lpm_fd, __u32 addr[4], __u32 prefixlen, void *value)
 }
 
 
-
+/*中断处理函数*/
 static void int_exit(int sig)
 {
 	__u32 curr_prog_id = 0;
@@ -77,8 +73,7 @@ static void int_exit(int sig)
 	exit(0);
 }
 
-/* simple per-protocol drop counter
- */
+/* 丢包计数输出 */
 static void poll_stats(int map_fd, int interval)
 {
 	unsigned int nr_cpus = bpf_num_possible_cpus();
@@ -251,7 +246,7 @@ int main(int argc, char **argv)
 	}
 	prog_id = info.id;
 
-	//循环处理map中的信息,显示到用户态
+	//循环处理map中的信息,显示丢包计数到用户态
 	poll_stats(map_info_fd, 1);
 
 	return 0;
