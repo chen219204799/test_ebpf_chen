@@ -20,6 +20,26 @@
 static int ifindex;
 static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST;
 static __u32 prog_id;
+#define type_drop 99
+
+struct ipv4_lpm_key {
+        __u32 prefixlen;
+        __u32 data;
+};
+
+int add_prefix_entry(int lpm_fd, __u32 addr, __u32 prefixlen, void *value);
+
+
+//添加IP地址进地址map
+int add_prefix_entry(int lpm_fd, __u32 addr, __u32 prefixlen, void *value)
+{
+        struct ipv4_lpm_key ipv4_key = {
+                .prefixlen = prefixlen,
+                .data = addr
+        };
+        return bpf_map_update_elem(lpm_fd, &ipv4_key, value, BPF_ANY);
+}
+
 
 static void int_exit(int sig)
 {
@@ -57,9 +77,10 @@ static void poll_stats(int map_fd, int interval)
 			assert(bpf_map_lookup_elem(map_fd, &key, values) == 0);
 			for (i = 0; i < nr_cpus; i++)
 				sum += values[i];
-			if (sum > prev[key])
-				printf("type %u: %10llu pkt/s\n",
-				       key, (sum - prev[key]) / interval);
+			
+			if (sum > prev[key] && type_drop == key)
+				printf("drop rate: %10llu pkt/s     drop num:%10llu pkts\n",(sum - prev[key]) / interval,sum);
+			
 			prev[key] = sum;
 		}
 	}
@@ -79,12 +100,16 @@ int main(int argc, char **argv)
 	struct bpf_prog_info info = {};
 	__u32 info_len = sizeof(info);
 	const char *optstr = "FSN";
-	int prog_fd, map_fd, opt;
+	int prog_fd, map_info_fd, map_iplist_fd,opt;
 	struct bpf_program *prog;
 	struct bpf_object *obj;
-	struct bpf_map *map;
+	struct bpf_map *map_info = NULL;
+	struct bpf_map *map_iplist = NULL;
+	long *value;
 	char filename[256];
 	int err;
+	__u32 ip_addr = 0x5801a8c0;
+	__u32 prefixlen = 32;
 
 	while ((opt = getopt(argc, argv, optstr)) != -1) {
 		switch (opt) {
@@ -131,17 +156,42 @@ int main(int argc, char **argv)
 	//获取内核空间的obj   ->prog->fd索引
 	prog_fd = bpf_program__fd(prog);
 
-	//获取obj的map信息
-	map = bpf_object__next_map(obj, NULL);
-	if (!map) {
+	
+
+	//获取obj的map_rxcnt信息
+	map_info = bpf_object__find_map_by_name(obj,"rxcnt");
+	if (!map_info) {
 		printf("finding a map in obj file failed\n");
 		return 1;
 	}
+	//printf("----------------map_info:%p--------------\n",map_info);
 
-	//获取map的fd
-	map_fd = bpf_map__fd(map);
-	if (!prog_fd) {
+	//获取map_rxcnt的fd
+	map_info_fd = bpf_object__find_map_fd_by_name(obj,"rxcnt");
+	if (!map_info_fd) {
 		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
+		return 1;
+	}
+	//printf("----------------map_info_fd:%d--------------\n",map_info_fd);
+
+
+	
+	//获取obj的map_ipv4_lpm_map信息
+	map_iplist = bpf_object__find_map_by_name(obj, "ipv4_lpm_map");
+	if (!map_iplist) {
+		printf("finding a map in obj file failed\n");
+		return 1;
+	}
+	
+	//获取map2的fd
+	map_iplist_fd = bpf_object__find_map_fd_by_name(obj, "ipv4_lpm_map");
+	if (!map_iplist_fd) {
+		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
+		return 1;
+	}
+	//添加IPv4地址进map
+	if(add_prefix_entry(map_iplist_fd, ip_addr, prefixlen,&value)){
+		printf("set ip_addr failed \n");
 		return 1;
 	}
 	
@@ -165,7 +215,7 @@ int main(int argc, char **argv)
 	prog_id = info.id;
 
 	//循环处理map中的信息,显示到用户态
-	poll_stats(map_fd, 1);
+	poll_stats(map_info_fd, 1);
 
 	return 0;
 }
