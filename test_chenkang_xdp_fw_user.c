@@ -127,9 +127,12 @@ int main(int argc, char **argv)
 	long *value;
 	char filename[256];
 	int err;
+
+	//需阻断的IP地址 prefixlen为掩码长度 支持配置掩码
 	__u32 ipv4_addr = 0x5801a8c0;
 	__u32 prefixlen_v4 = 32;
 
+	//需阻断的IP地址    后续优化可以从程序启动参数或某文件读取
 	__u32 ipv6_addr[4] = {0xaabbccdd,0xaabbccdd,0xaabbccdd,0xaabbccdd};
 	__u32 prefixlen_v6 = 128;
 
